@@ -1,10 +1,10 @@
 """
-WHIEDA — Телеграм бот Антон + Оплата через СБП
+WHIEDA — Телеграм бот Антон + Оплата через СБП + Голос Яндекс SpeechKit
 Переменные окружения:
-  TG_TOKEN, ANTHROPIC_KEY, DATA_DIR, SBP_PHONE, SBP_NAME, ADMIN_ID
+  TG_TOKEN, ANTHROPIC_KEY, DATA_DIR, SBP_PHONE, SBP_NAME, ADMIN_ID, YANDEX_KEY
 """
 
-import os, json, asyncio
+import os, json, asyncio, aiohttp, tempfile
 from pathlib import Path
 from anthropic import Anthropic
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -20,8 +20,44 @@ SBP_NAME             = os.environ.get("SBP_NAME", "Антон")
 PRICE_RUB            = 500
 REQUESTS_PER_PAYMENT = 1000
 ADMIN_ID             = int(os.environ.get("ADMIN_ID", "0"))
+YANDEX_KEY           = os.environ.get("YANDEX_KEY", "")
 
 client = Anthropic(api_key=ANTHROPIC_KEY)
+
+# ── Голос Яндекс SpeechKit ──
+async def text_to_voice(text: str) -> bytes | None:
+    """Синтезирует речь голосом Антона через Яндекс SpeechKit"""
+    if not YANDEX_KEY:
+        return None
+    try:
+        url = "https://tts.api.cloud.yandex.net/speech/v1/tts:synthesize"
+        headers = {"Authorization": f"Api-Key {YANDEX_KEY}"}
+        data = {
+            "text": text,
+            "lang": "ru-RU",
+            "voice": "anton",
+            "speed": "1.0",
+            "format": "mp3",
+            "sampleRateHertz": "48000",
+        }
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, headers=headers, data=data) as resp:
+                if resp.status == 200:
+                    return await resp.read()
+    except Exception as e:
+        print(f"TTS error: {e}")
+    return None
+
+async def send_voice_reply(update, text: str):
+    """Отправляет текст + голосовое сообщение"""
+    await update.message.reply_text(text)
+    audio = await text_to_voice(text)
+    if audio:
+        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
+            f.write(audio)
+            f.flush()
+            await update.message.reply_voice(voice=open(f.name, "rb"))
+        os.unlink(f.name)
 
 # ── Стор ──
 def state_path(uid): return DATA_DIR / f"{uid}.json"
@@ -184,7 +220,9 @@ async def handle_message(update, ctx):
     if state.get("day_ended"): await update.message.reply_text("День завершён 😊\n\nНапиши /next чтобы продолжить."); return
     if not has_ai(state): await show_payment(update.message,state,uid); return
     state["replics_left"]-=1; use_ai(state)
-    try: reply = await get_reply(state,text); save_state(uid,state); await update.message.reply_text(reply)
+    try:
+        reply = await get_reply(state,text); save_state(uid,state)
+        await send_voice_reply(update, reply) if YANDEX_KEY else await update.message.reply_text(reply)
     except: await update.message.reply_text("Что-то пошло не так, попробуй ещё раз."); return
     bal = state.get("ai_limit",0)-state.get("ai_requests",0)
     if bal==10: await update.message.reply_text("⚠️ Осталось 10 запросов. Пополнить: /pay")
