@@ -99,8 +99,21 @@ def is_end(reply, replics): return replics<=0 or any(p in reply.lower() for p in
 def reset_day(state): state["history"]=[]; state["day_ended"]=False; state["replics_left"]=5 if state["day"]==4 else 10
 
 # ── Хендлеры ──
+GAME_URL = "https://bespoke-cactus-c77dc2.netlify.app"
+
 async def cmd_start(update, ctx):
-    uid = update.effective_user.id; state = fresh_state(); save_state(uid,state); await send_survey_step(update,state,uid)
+    uid = update.effective_user.id; state = fresh_state(); save_state(uid,state)
+    from telegram import WebAppInfo
+    keyboard = InlineKeyboardMarkup([[
+        InlineKeyboardButton("🎮 Играть", web_app=WebAppInfo(url=GAME_URL))
+    ],[
+        InlineKeyboardButton("💬 Текстовый режим", callback_data="text_mode")
+    ]])
+    await update.message.reply_text(
+        "🎯 *MHIEDA GAME*\n\nСимулятор рекрутинга за 730 дней.\n\nВыбери как играть:",
+        reply_markup=keyboard,
+        parse_mode="Markdown"
+    )
 
 async def cmd_next(update, ctx):
     uid = update.effective_user.id; state = load_state(uid)
@@ -137,6 +150,10 @@ async def cmd_activate(update, ctx):
 async def handle_callback(update, ctx):
     query = update.callback_query; uid = update.effective_user.id; state = load_state(uid); data = query.data
     await query.answer()
+    if data == "text_mode":
+        await query.message.reply_text("💬 Текстовый режим. Сейчас тебе напишет Антон 👇")
+        await send_survey_step(update, state, uid)
+        return
     if state and state.get("stage")=="survey":
         step = state.get("survey_step",0)
         if step==1 and data.startswith("age_"): state["survey"]["age_group"]=data.replace("age_",""); state["survey_step"]=2; save_state(uid,state); await send_survey_step(update,state,uid)
