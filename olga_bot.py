@@ -234,6 +234,49 @@ async def handle_message(update, ctx):
         else: await update.message.reply_text(f"День {state['day']} завершён.\n\n/next чтобы продолжить.")
 
 def main():
+    import threading
+    from http.server import HTTPServer, BaseHTTPRequestHandler
+    import json as json_lib
+
+    class ProxyHandler(BaseHTTPRequestHandler):
+        def log_message(self, format, *args): pass
+
+        def do_OPTIONS(self):
+            self.send_response(200)
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
+            self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+            self.end_headers()
+
+        def do_POST(self):
+            if self.path == '/api/chat':
+                length = int(self.headers.get('Content-Length', 0))
+                body = json_lib.loads(self.rfile.read(length))
+                try:
+                    resp = client.messages.create(
+                        model=body.get('model', 'claude-sonnet-4-20250514'),
+                        max_tokens=body.get('max_tokens', 200),
+                        system=body.get('system', ''),
+                        messages=body.get('messages', [])
+                    )
+                    result = {'content': [{'type': 'text', 'text': resp.content[0].text}]}
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json_lib.dumps(result).encode())
+                except Exception as e:
+                    self.send_response(500)
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(str(e).encode())
+
+    PORT = int(os.environ.get('PORT', 8080))
+    server = HTTPServer(('0.0.0.0', PORT), ProxyHandler)
+    t = threading.Thread(target=server.serve_forever, daemon=True)
+    t.start()
+    print(f"Прокси запущен на порту {PORT}")
+
     app = Application.builder().token(TG_TOKEN).build()
     app.add_handler(CommandHandler("start",    cmd_start))
     app.add_handler(CommandHandler("next",     cmd_next))
