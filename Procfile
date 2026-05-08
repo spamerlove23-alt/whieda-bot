@@ -1,1 +1,1 @@
-worker: python olga_bot.py
+web: python proxy.py
