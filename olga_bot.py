@@ -234,6 +234,7 @@ async def handle_message(update, ctx):
         else: await update.message.reply_text(f"День {state['day']} завершён.\n\n/next чтобы продолжить.")
 
 def main():
+    print(f"[whieda-bot] GAME_URL = {GAME_URL}", flush=True)
     import threading
     from http.server import HTTPServer, BaseHTTPRequestHandler
     import json as json_lib

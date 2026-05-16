@@ -32,7 +32,7 @@ def health():
     return jsonify({'status': 'ok'})
 
 def run_bot():
-    import olga_bot_payment as bot
+    import olga_bot as bot
     bot.main()
 
 if __name__ == '__main__':
