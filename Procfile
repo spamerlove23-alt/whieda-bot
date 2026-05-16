@@ -1,1 +1,1 @@
-web: python proxy.py
+web: python olga_bot.py
