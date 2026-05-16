@@ -135,7 +135,7 @@ def is_end(reply, replics): return replics<=0 or any(p in reply.lower() for p in
 def reset_day(state): state["history"]=[]; state["day_ended"]=False; state["replics_left"]=5 if state["day"]==4 else 10
 
 # ── Хендлеры ──
-GAME_URL = "https://bespoke-cactus-c77dc2.netlify.app"
+GAME_URL = "https://whieda.pages.dev/start"
 
 async def cmd_start(update, ctx):
     uid = update.effective_user.id; state = fresh_state(); save_state(uid,state)
